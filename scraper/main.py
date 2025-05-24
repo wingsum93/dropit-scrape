@@ -64,9 +64,16 @@ def scrape_multiple_pages(urls):
     driver = setup_driver(headless=False)
     try:
         all_products = []
+        seen_urls = set()
         for url in urls:
             print(f"Scraping {url} ...")
             products = scrape_page(driver, url)
+            for p in products:
+                if p['url'] not in seen_urls:
+                    seen_urls.add(p['url'])
+                    all_products.append(p)
+                else:
+                    print(f"Duplicate found: {p['url']}")
             all_products.extend(products)
         return all_products
     finally:
@@ -79,7 +86,7 @@ def save_to_json(data, filename='output.json'):
 
 def save_to_csv(data, filename='output.csv'):
     with open(filename, 'w', encoding='utf-8-sig', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=['image_url', 'title', 'date', 'other'])
+        writer = csv.DictWriter(f, fieldnames=['name', 'unit', 'price', 'url'])
         writer.writeheader()
         writer.writerows(data)
 
@@ -96,5 +103,8 @@ if __name__ == "__main__":
         'https://www.dropit.bm/shop/frozen_foods/d/22886624#!/?limit=96&page=3',
     ]
     products = scrape_multiple_pages(urls)
+    print(f"Total products scraped: {len(products)}")
+    save_to_csv(products, 'products.csv')
     for product in products:
         print(product)
+        
