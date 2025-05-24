@@ -6,6 +6,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
+from urllib.parse import urljoin
 import csv
 import json
 
@@ -21,6 +22,7 @@ def setup_driver(headless=False):
 def close_driver(driver):
     if driver:
         driver.quit()
+BASE_URL = 'https://www.dropit.bm'
 
 def extract_product_info(html):
     soup = BeautifulSoup(html, 'html.parser')
@@ -31,15 +33,19 @@ def extract_product_info(html):
         name_tag = item.select_one('div.fp-item-name span a')
         price_tag = item.select_one('div.fp-item-price span.fp-item-base-price')
         unit_tag = item.select_one('div.fp-item-price span.fp-item-size')
+        
 
         product_name = name_tag.text.strip() if name_tag else 'N/A'
         product_price = price_tag.text.strip() if price_tag else 'N/A'
         product_unit = unit_tag.text.strip() if unit_tag else 'N/A'
+        product_url = name_tag['href'] if name_tag and 'href' in name_tag.attrs else 'N/A'
+        full_url = urljoin(BASE_URL, product_url) if product_url else 'N/A'
 
         results.append({
             'name': product_name,
             'price': product_price,
-            'unit': product_unit
+            'unit': product_unit,
+            'url': full_url
         })
 
     return results
@@ -55,7 +61,7 @@ def scrape_page(driver, url):
     return extract_product_info(html)
 
 def scrape_multiple_pages(urls):
-    driver = setup_driver(headless=True)
+    driver = setup_driver(headless=False)
     try:
         all_products = []
         for url in urls:
