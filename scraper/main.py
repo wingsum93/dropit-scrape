@@ -8,6 +8,10 @@ from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 from logger_setup import get_logger
+from db import insert_all_products
+from model import Product
+from decimal import Decimal, InvalidOperation
+from typing import List, Optional
 import logging
 import csv
 import json
@@ -29,10 +33,10 @@ def close_driver(driver):
         driver.quit()
 BASE_URL = 'https://www.dropit.bm'
 
-def extract_product_info(html):
+def extract_product_info(html) -> List[Product]:
     soup = BeautifulSoup(html, 'html.parser')
     items = soup.select('div.fp-item-content')
-    results = []
+    results: List[Product] = []
 
     for item in items:
         name_tag = item.select_one('div.fp-item-name span a')
@@ -41,17 +45,25 @@ def extract_product_info(html):
         
 
         product_name = name_tag.text.strip() if name_tag else 'N/A'
-        product_price = price_tag.text.strip() if price_tag else 'N/A'
+        product_price_with_dollar = price_tag.text.strip() if price_tag else 'N/A'
         product_unit = unit_tag.text.strip() if unit_tag else 'N/A'
         product_url = name_tag['href'] if name_tag and 'href' in name_tag.attrs else 'N/A'
         full_url = urljoin(BASE_URL, product_url) if product_url else 'N/A'
 
-        results.append({
-            'name': product_name,
-            'price': product_price,
-            'unit': product_unit,
-            'url': full_url
-        })
+        product_price: Optional[Decimal] = None
+        if product_price_with_dollar.startswith('$'):
+            try:
+                product_price = Decimal(product_price_with_dollar[1:])
+            except InvalidOperation:
+                product_price = None
+
+        # 用 keyword args 建立 Product 實例
+        results.append(Product(
+            name=product_name,
+            price=product_price,
+            unit=product_unit,
+            url=full_url
+        ))
 
     return results
 
@@ -74,11 +86,11 @@ def scrape_multiple_pages(urls):
             logger.debug(f"Scraping {url} ...")
             products = scrape_page(driver, url)
             for p in products:
-                if p['url'] not in seen_urls:
-                    seen_urls.add(p['url'])
+                if p.url not in seen_urls:
+                    seen_urls.add(p.url)
                     all_products.append(p)
                 else:
-                    logger.debug(f"Duplicate found: {p['url']}")
+                    logger.debug(f"Duplicate found: {p.url}")
             all_products.extend(products)
         return all_products
     finally:
@@ -89,12 +101,6 @@ def save_to_json(data, filename='output.json'):
     with open(filename, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
-def save_to_csv(data, filename='output.csv'):
-    with open(filename, 'w', encoding='utf-8-sig', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=['name', 'unit', 'price', 'url'])
-        writer.writeheader()
-        writer.writerows(data)
-
 def generate_urls(num_pages=1):
     if num_pages < 1:
         return []
@@ -103,13 +109,9 @@ def generate_urls(num_pages=1):
 
 if __name__ == "__main__":
     urls = [
-        'https://www.dropit.bm/shop/frozen_foods/d/22886624#!/?limit=96&page=1',
-        'https://www.dropit.bm/shop/frozen_foods/d/22886624#!/?limit=96&page=2',
-        'https://www.dropit.bm/shop/frozen_foods/d/22886624#!/?limit=96&page=3',
+        'https://www.dropit.bm/shop/frozen_foods/d/22886624#!/?limit=96&page=1'
     ]
     products = scrape_multiple_pages(urls)
     logger.debug(f"Total products scraped: {len(products)}")
-    save_to_csv(products, 'products.csv')
-    for product in products:
-        logger.debug(product)
+    insert_all_products(products)
         
