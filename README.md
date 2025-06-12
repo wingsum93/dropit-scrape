@@ -25,7 +25,11 @@ pip install -r requirements.txt
 
 
 
-
+# Installation
+Install python 3
+Install ![Warp](https://www.warp.dev/)
+Install postgres db
+    Can be from container / install for machine
 
 
 
