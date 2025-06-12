@@ -5,14 +5,14 @@ For user to fetch website product and price
 
 ## how to setup virtual environment
 
-```
+```sh
 python -m venv .venv
 source .venv/bin/activate  # Windows 用 .venv\Scripts\activate
 ```
 
 
 ### Install Lib (win)
-```
+```sh
 pip install -r requirements.txt
 ```
 
@@ -28,7 +28,7 @@ pip install -r requirements.txt
 # Installation
 Install python 3
 Install ![Warp](https://www.warp.dev/)
-Install postgres db
+Install postgres db (optional)
     Can be from container / install for machine
 
 

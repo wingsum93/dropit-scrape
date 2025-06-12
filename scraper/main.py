@@ -7,8 +7,13 @@ from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
+from logger_setup import get_logger
+import logging
 import csv
 import json
+
+
+logger = get_logger(__name__, log_file="logs/myapp.log", level=logging.DEBUG)
 
 def setup_driver(headless=False):
     options = Options()
@@ -66,14 +71,14 @@ def scrape_multiple_pages(urls):
         all_products = []
         seen_urls = set()
         for url in urls:
-            print(f"Scraping {url} ...")
+            logger.debug(f"Scraping {url} ...")
             products = scrape_page(driver, url)
             for p in products:
                 if p['url'] not in seen_urls:
                     seen_urls.add(p['url'])
                     all_products.append(p)
                 else:
-                    print(f"Duplicate found: {p['url']}")
+                    logger.debug(f"Duplicate found: {p['url']}")
             all_products.extend(products)
         return all_products
     finally:
@@ -103,8 +108,8 @@ if __name__ == "__main__":
         'https://www.dropit.bm/shop/frozen_foods/d/22886624#!/?limit=96&page=3',
     ]
     products = scrape_multiple_pages(urls)
-    print(f"Total products scraped: {len(products)}")
+    logger.debug(f"Total products scraped: {len(products)}")
     save_to_csv(products, 'products.csv')
     for product in products:
-        print(product)
+        logger.debug(product)
         
