@@ -84,7 +84,7 @@ def scrape_all_pages_with_pagination(driver, base_url):
         )
 
         products = scrape_page(driver)
-        
+
         for p in products:
             if p.url not in seen_urls:
                 seen_urls.add(p.url)
@@ -110,18 +110,29 @@ def scrape_all_pages_with_pagination(driver, base_url):
 def save_to_json(data, filename='output.json'):
     with open(filename, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
+def print_longest_property_lengths(products):
+    if not products:
+        logger.debug("No products.")
+        return
 
-def generate_urls(num_pages=1):
-    if num_pages < 1:
-        return []
-    base_url = 'https://www.dropit.bm/shop/frozen_foods/d/22886624#!/?limit=96&page='
-    return [f'{base_url}{page}' for page in range(1, num_pages + 1)]
+    max_lengths = {}
 
+    # 支援 dict 或 ORM object
+    for p in products:
+        attrs = p if isinstance(p, dict) else vars(p)
+        for key, value in attrs.items():
+            val_str = str(value) if value is not None else ''
+            max_lengths[key] = max(max_lengths.get(key, 0), len(val_str))
+
+    for key, length in max_lengths.items():
+        logger.debug(f"{key}: max length = {length}")
 if __name__ == "__main__":
     url = 'https://www.dropit.bm/shop/frozen_foods/d/22886624#!/?limit=96&page=1'
     
     driver = setup_driver(headless=False)
     products = scrape_all_pages_with_pagination(driver, url)
     logger.debug(f"Total products scraped: {len(products)}")
+    
+    print_longest_property_lengths(products)
     insert_all_products(products)
         

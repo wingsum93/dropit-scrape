@@ -10,3 +10,12 @@ class Selector:
     LIST_OF_PRODUCTS: str = 'div.fp-item-content'
     NEXT_PAGE_BTN: str = 'li.fp-pager-item-next a.fp-btn-next'
     NEXT_PAGE_BTN_PARENT: str = 'li.fp-pager-item-next'
+
+@dataclass(frozen=True)
+class ProductDetailSelector:
+    NAME: str = 'div.fp-item-name span a'
+    PRICE: str = 'div.fp-item-price span.fp-item-base-price'
+    UNIT: str = 'div.fp-item-price span.fp-item-size'
+    
+    LOCATIOIN: str = 'div.fp-item-content'
+    SKU: str = 'li.fp-pager-item-next a.fp-btn-next'

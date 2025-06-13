@@ -17,7 +17,10 @@ pip install -r requirements.txt
 ```
 
 
-
+### Init postgresdb
+```shell
+python ./scraper/db.py
+```
 
 
 
