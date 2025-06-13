@@ -107,9 +107,9 @@ def scrape_all_pages_with_pagination(driver, base_url):
             # 記錄當前列表容器，等它變 stale
             container = driver.find_element(By.CSS_SELECTOR, Selector.LIST_OF_PRODUCTS)
             # 點擊
-            ActionChains(driver).move_to_element(next_btn_container).click(next_btn_container).perform()
+            ActionChains(driver).move_to_element(next_btn_container).click().perform()
+            ActionChains(driver).move_to_element(next_btn).click().perform()
             logger.debug("Clicked next page button.")
-            driver.save_screenshot("temp/debug_click.png")
 
             # 等容器失效（整頁刷新或部分更新）
             WebDriverWait(driver, 10).until(EC.staleness_of(container))
@@ -122,7 +122,24 @@ def scrape_all_pages_with_pagination(driver, base_url):
             break
 
     return all_products
-
+def run_category_scraper(category_name: str, url: str) -> None:
+    """
+    Scrape all pages for one category, 填入 category_name, 並存庫。
+    """
+    driver = setup_driver(headless=False)
+    try:
+        raw_products = scrape_all_pages_with_pagination(driver, url)
+        logger.info(f"[{category_name}] Scraped {len(raw_products)} raw products.")
+        
+        # 填入 category
+        products: List[Product] = []
+        for rp in raw_products:
+            rp.category = category_name
+            products.append(rp)
+        
+        insert_new_products(products)
+    finally:
+        driver.quit()
 
 def save_to_json(data, filename='output.json'):
     with open(filename, 'w', encoding='utf-8') as f:
@@ -143,13 +160,27 @@ def print_longest_property_lengths(products):
 
     for key, length in max_lengths.items():
         logger.debug(f"{key}: max length = {length}")
+def main():
+    """
+    主程式：可支援多個 category，同時呼叫 run_category_scraper
+    """
+    # 你可以用 dict 來管理多個 category 與對應 URL
+    category_map = {
+        #"frozen food": "https://www.dropit.bm/shop/frozen_foods/d/22886624#!/?limit=96&page=1",
+        "bakery": "https://www.dropit.bm/shop/bakery/d/22886616#!/?limit=96&page=1",
+        "BWS": "https://www.dropit.bm/shop/beer_wine_spirits/d/22886618#!/?limit=96&page=1",
+        "dairy": "https://www.dropit.bm/shop/dairy/d/22886620#!/?limit=96&page=1",
+        "deli": "https://www.dropit.bm/shop/deli/d/22886622#!/?limit=96&page=1",
+        "home_floral": "https://www.dropit.bm/shop/home_floral/d/22886626#!/?limit=96&page=1",
+        "meat": "https://www.dropit.bm/shop/meat/d/22886628#!/?limit=96&page=1",
+        "pantry": "https://www.dropit.bm/shop/pantry/d/22886630#!/?limit=96&page=1",
+        "produce": "https://www.dropit.bm/shop/produce/d/22886632#!/?limit=96&page=1",
+        "seafood": "https://www.dropit.bm/shop/seafood/d/22886634#!/?limit=96&page=1",
+    }
+    
+    for cat, url in category_map.items():
+        run_category_scraper(cat, url)
+
 if __name__ == "__main__":
-    url = 'https://www.dropit.bm/shop/frozen_foods/d/22886624#!/?limit=96&page=1'
-    
-    driver = setup_driver(headless=False)
-    products = scrape_all_pages_with_pagination(driver, url)
-    logger.debug(f"Total products scraped: {len(products)}")
-    
-    print_longest_property_lengths(products)
-    insert_new_products(products)
+    main()
         

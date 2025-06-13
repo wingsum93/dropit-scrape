@@ -7,7 +7,7 @@ class Selector:
     PRICE: str = 'div.fp-item-price span.fp-item-base-price'
     UNIT: str = 'div.fp-item-price span.fp-item-size'
     URL: str = 'div.fp-item-name span a'  # same as NAME，因為 href 在 name tag
-    LIST_OF_PRODUCTS: str = 'div.fp-item-content'
+    LIST_OF_PRODUCTS: str = 'ul.fp-product-list div.fp-item-content'
     NEXT_PAGE_BTN: str = 'li.fp-pager-item-next a.fp-btn-next'
     NEXT_PAGE_BTN_PARENT: str = 'li.fp-pager-item-next'
 
