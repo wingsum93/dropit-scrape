@@ -4,11 +4,14 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver import ActionChains
+from selenium.common.exceptions import NoSuchElementException
 from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 from logger_setup import get_logger
 from db import insert_all_products
+from selector import Selector
 from model import Product
 from decimal import Decimal, InvalidOperation
 from typing import List, Optional
@@ -17,7 +20,7 @@ import csv
 import json
 
 
-logger = get_logger(__name__, log_file="logs/myapp.log", level=logging.DEBUG)
+logger = get_logger(__name__, log_file="logs/dropit.log", level=logging.DEBUG)
 
 def setup_driver(headless=False):
     options = Options()
@@ -35,14 +38,13 @@ BASE_URL = 'https://www.dropit.bm'
 
 def extract_product_info(html) -> List[Product]:
     soup = BeautifulSoup(html, 'html.parser')
-    items = soup.select('div.fp-item-content')
+    items = soup.select(Selector.LIST_OF_PRODUCTS)
     results: List[Product] = []
 
     for item in items:
-        name_tag = item.select_one('div.fp-item-name span a')
-        price_tag = item.select_one('div.fp-item-price span.fp-item-base-price')
-        unit_tag = item.select_one('div.fp-item-price span.fp-item-size')
-        
+        name_tag = item.select_one(Selector.NAME)
+        price_tag = item.select_one(Selector.PRICE)
+        unit_tag = item.select_one(Selector.UNIT)
 
         product_name = name_tag.text.strip() if name_tag else 'N/A'
         product_price_with_dollar = price_tag.text.strip() if price_tag else 'N/A'
@@ -67,34 +69,42 @@ def extract_product_info(html) -> List[Product]:
 
     return results
 
-def scrape_page(driver, url):
-    driver.get(url)
-
-    WebDriverWait(driver, 30).until(
-        EC.presence_of_element_located((By.CSS_SELECTOR, ".fp-item-content"))
-    )
-
+def scrape_page(driver):
     html = driver.page_source
     return extract_product_info(html)
 
-def scrape_multiple_pages(urls):
-    driver = setup_driver(headless=False)
-    try:
-        all_products = []
-        seen_urls = set()
-        for url in urls:
-            logger.debug(f"Scraping {url} ...")
-            products = scrape_page(driver, url)
-            for p in products:
-                if p.url not in seen_urls:
-                    seen_urls.add(p.url)
-                    all_products.append(p)
-                else:
-                    logger.debug(f"Duplicate found: {p.url}")
-            all_products.extend(products)
-        return all_products
-    finally:
-        close_driver(driver)
+def scrape_all_pages_with_pagination(driver, base_url):
+    all_products = []
+    seen_urls = set()
+    driver.get(base_url)
+
+    while True:
+        WebDriverWait(driver, 20).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, Selector.LIST_OF_PRODUCTS))
+        )
+
+        products = scrape_page(driver)
+        
+        for p in products:
+            if p.url not in seen_urls:
+                seen_urls.add(p.url)
+                all_products.append(p)
+        logger.debug(f"Scraped {len(products)} products from current page.")
+        try:
+            next_btn = driver.find_element(By.CSS_SELECTOR, Selector.NEXT_PAGE_BTN)
+            next_btn_container = driver.find_element(By.CSS_SELECTOR, Selector.NEXT_PAGE_BTN_PARENT)
+            if 'fp-disabled' in next_btn.get_attribute('class'):
+                break
+            actions = ActionChains(driver)
+            actions.move_to_element(next_btn).click(next_btn).perform()
+            actions.move_to_element(next_btn_container).click(next_btn_container).perform()
+            logger.debug("Clicked next page button.")
+            driver.save_screenshot("temp/debug_click.png")
+            WebDriverWait(driver, 8).until(EC.staleness_of(next_btn))
+        except NoSuchElementException:
+            break
+
+    return all_products
 
 
 def save_to_json(data, filename='output.json'):
@@ -108,10 +118,10 @@ def generate_urls(num_pages=1):
     return [f'{base_url}{page}' for page in range(1, num_pages + 1)]
 
 if __name__ == "__main__":
-    urls = [
-        'https://www.dropit.bm/shop/frozen_foods/d/22886624#!/?limit=96&page=1'
-    ]
-    products = scrape_multiple_pages(urls)
+    url = 'https://www.dropit.bm/shop/frozen_foods/d/22886624#!/?limit=96&page=1'
+    
+    driver = setup_driver(headless=False)
+    products = scrape_all_pages_with_pagination(driver, url)
     logger.debug(f"Total products scraped: {len(products)}")
     insert_all_products(products)
         
