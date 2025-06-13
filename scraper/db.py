@@ -1,12 +1,13 @@
 from typing import List
 from contextlib import contextmanager
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy import or_  # ✅ 這邊 import or_ 函式
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.exc import SQLAlchemyError
 from model import Base  # ✅ 這邊 import model.py 裡面的 Base
 from model import Product  # ✅ 這邊 import model.py 裡面的 Product
 from dotenv import load_dotenv
+from logger_setup import get_logger  # ✅ 這邊 import logger_setup.py 裡面的 get_logger
 from config import Config
 import logging
 import csv
@@ -15,7 +16,7 @@ import os
 engine = create_engine(Config.SQLALCHEMY_DATABASE_URI)
 # 🧠 建立 session factory
 SessionLocal = sessionmaker(bind=engine, autoflush=True, autocommit=False)
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__,log_file="logs/dropit.log", level=logging.DEBUG)
 CSV_FILE = 'temp/failed_products.csv'
 FIELDNAMES = ['name', 'price', 'unit', 'url']
 
@@ -57,42 +58,52 @@ def save_products_to_csv(products: List[dict]):
         logger.critical(f"Failed to write fallback CSV: {e}", exc_info=True)
         raise
 
-def insert_all_products(products: List[Product]):
+def insert_new_products(products: List[Product]):
     """
-    將所有的 Product 寫入資料庫；若 DB 寫入失敗，備援寫入 CSV。
-    :param products: List[Product]
+    只將資料庫中還沒有的 products（用 url 驗證）插入；
+    若全部都已存在，則不做任何事。
     """
-    # get_session 現在是一個 context manager
+    # 先蒐集所有欲插入的 URL
+    incoming_urls = [p.url for p in products]
+
     with get_session() as session:
-        try:
-            session.add_all(products)
-            session.commit()
-            logger.info(f"Successfully inserted {len(products)} products into DB.")
+        # 查出已存在的那一批 URL
+        stmt = select(Product.url).where(Product.url.in_(incoming_urls))
+        existing = session.execute(stmt).scalars().all()
+        existing_set = set(existing)
+
+        # 過濾出真正要新增的 products
+        new_products = [p for p in products if p.url not in existing_set]
+
+        if not new_products:
+            logger.info("No new products to insert; all URLs already exist.")
             return
+
+        try:
+            session.add_all(new_products)
+            session.commit()
+            logger.info(
+                f"Inserted {len(new_products)} new products into DB; "
+                f"skipped {len(products) - len(new_products)} duplicates."
+            )
         except SQLAlchemyError as e:
             session.rollback()
             logger.error(
-                f"Error inserting {len(products)} products into DB: {e}",
+                f"Error inserting {len(new_products)} new products: {e}",
                 exc_info=True
             )
-
             # 準備 CSV 備援資料
             failed = [
-                {
-                    'name':  getattr(p, 'name', None),
-                    'price': getattr(p, 'price', None),
-                    'unit':  getattr(p, 'unit', None),
-                    'url':   getattr(p, 'url', None),
-                }
-                for p in products
+                {'name': getattr(p, 'name', None),
+                 'price': getattr(p, 'price', None),
+                 'unit': getattr(p, 'unit', None),
+                 'url': getattr(p, 'url', None)}
+                for p in new_products
             ]
-
-            # CSV 備援
             try:
                 save_products_to_csv(failed)
                 logger.info(f"Saved {len(failed)} failed products to CSV fallback.")
             except Exception as csv_e:
-                # 照實說：如果連寫 CSV 都失敗，要有適當告警或 raise
                 logger.critical(
                     f"Failed to write fallback CSV: {csv_e}",
                     exc_info=True

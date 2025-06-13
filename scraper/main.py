@@ -10,7 +10,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 from logger_setup import get_logger
-from db import insert_all_products
+from db import insert_new_products
 from selector import Selector
 from model import Product
 from decimal import Decimal, InvalidOperation
@@ -134,5 +134,5 @@ if __name__ == "__main__":
     logger.debug(f"Total products scraped: {len(products)}")
     
     print_longest_property_lengths(products)
-    insert_all_products(products)
+    insert_new_products(products)
         
