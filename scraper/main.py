@@ -5,7 +5,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver import ActionChains
-from selenium.common.exceptions import NoSuchElementException
+from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
@@ -78,30 +78,47 @@ def scrape_all_pages_with_pagination(driver, base_url):
     seen_urls = set()
     driver.get(base_url)
 
+    # 初次等待商品列表出現
+    WebDriverWait(driver, 20).until(
+        EC.presence_of_element_located((By.CSS_SELECTOR, Selector.LIST_OF_PRODUCTS))
+    )
+
     while True:
-        WebDriverWait(driver, 20).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, Selector.LIST_OF_PRODUCTS))
-        )
-
+        # 確保列表已經載入
         products = scrape_page(driver)
-
         for p in products:
             if p.url not in seen_urls:
                 seen_urls.add(p.url)
                 all_products.append(p)
         logger.debug(f"Scraped {len(products)} products from current page.")
+
         try:
-            next_btn = driver.find_element(By.CSS_SELECTOR, Selector.NEXT_PAGE_BTN)
+            # 找到下一頁按鈕
+            next_btn = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, Selector.NEXT_PAGE_BTN))
+            )
             next_btn_container = driver.find_element(By.CSS_SELECTOR, Selector.NEXT_PAGE_BTN_PARENT)
+
+            # 如果按鈕上有禁用 class，就跳出
             if 'fp-disabled' in next_btn.get_attribute('class'):
+                logger.debug("Next button is disabled; end of pagination.")
                 break
-            actions = ActionChains(driver)
-            actions.move_to_element(next_btn).click(next_btn).perform()
-            actions.move_to_element(next_btn_container).click(next_btn_container).perform()
+
+            # 記錄當前列表容器，等它變 stale
+            container = driver.find_element(By.CSS_SELECTOR, Selector.LIST_OF_PRODUCTS)
+            # 點擊
+            ActionChains(driver).move_to_element(next_btn_container).click(next_btn_container).perform()
             logger.debug("Clicked next page button.")
             driver.save_screenshot("temp/debug_click.png")
-            WebDriverWait(driver, 8).until(EC.staleness_of(next_btn))
-        except NoSuchElementException:
+
+            # 等容器失效（整頁刷新或部分更新）
+            WebDriverWait(driver, 10).until(EC.staleness_of(container))
+            # 再等新的列表出現
+            WebDriverWait(driver, 20).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, Selector.LIST_OF_PRODUCTS))
+            )
+        except (NoSuchElementException, TimeoutException):
+            logger.debug("No next button or timeout waiting; end of pagination.")
             break
 
     return all_products
