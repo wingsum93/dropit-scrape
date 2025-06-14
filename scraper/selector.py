@@ -14,7 +14,7 @@ class Selector:
 @dataclass(frozen=True)
 class ProductDetailSelector:
     NAME: str = 'h1.fp-page-header.fp-page-title'
-    PRICE: str = 'div.fp-item-price span.fp-item-base-price'
+    PRICE: str = 'div.fp-item-detail.fp-item-detail-lg div.fp-item-price span.fp-item-base-price'
     UNIT: str = 'div.fp-item-price span.fp-item-size'
     
     LOCATIOIN: str = 'div.fp-item-location'

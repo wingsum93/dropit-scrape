@@ -20,7 +20,7 @@ class Product(Base):
     url = Column(String(500), unique=True, nullable=False, comment="產品連結")
     category = Column(String(20), nullable=True, comment="產品類別")
     sku = Column(String(15), nullable=True, comment="SKU/UPC")
-    location = Column(String(20), nullable=True, comment="產品位置")
+    location = Column(String(30), nullable=True, comment="產品位置")
     created_at = Column(
         Date,
         server_default=func.current_date(),

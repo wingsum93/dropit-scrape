@@ -129,7 +129,7 @@ def fetch_all_products():
     """從 DB 讀取所有 Product"""
     with get_session() as db:
         products = db.query(Product).all()
-        logger.info(f"Fetched {len(products)} products from DB")
+        logger.debug(f"Fetched {len(products)} products from DB")
         return products
 
 def update_product( prod, sku: str = None, location: str = None):
@@ -142,7 +142,7 @@ def update_product( prod, sku: str = None, location: str = None):
         prod.updated_at = func.current_date()
         db.add(prod)
         db.commit()
-        logger.info(f"Updated product {prod.id}: sku={sku}, location={location}")
+        logger.debug(f"Updated product {prod.id}: sku={sku}, location={location}")
 
 
 def insert_price_history( product_id: int, price: float):
@@ -154,7 +154,7 @@ def insert_price_history( product_id: int, price: float):
         )
         db.add(record)
         db.commit()
-        logger.info(f"Inserted price history for product {product_id}: {price}")
+        logger.debug(f"Inserted price history for product {product_id}: {price}")
 
 def get_product_random(limit: int = 10) -> list[Product]:
     """
@@ -174,7 +174,7 @@ def get_product_random(limit: int = 10) -> list[Product]:
               .limit(limit)
               .all()
         )
-        logger.info(f"Fetched {len(products)} random products without price history on {today}")
+        logger.debug(f"Fetched {len(products)} random products without price history on {today}")
         return products
 
 
