@@ -1,17 +1,19 @@
 from typing import List
 from contextlib import contextmanager
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, select, func
 from sqlalchemy import or_  # ✅ 這邊 import or_ 函式
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.exc import SQLAlchemyError
 from model import Base  # ✅ 這邊 import model.py 裡面的 Base
 from model import Product  # ✅ 這邊 import model.py 裡面的 Product
+from model import ProductPriceHistory  # ✅ 這邊 import model.py 裡面的 ProductPriceHistory
 from dotenv import load_dotenv
 from logger_setup import get_logger  # ✅ 這邊 import logger_setup.py 裡面的 get_logger
 from config import Config
 import logging
 import csv
 import os
+from datetime import date
 
 engine = create_engine(Config.SQLALCHEMY_DATABASE_URI)
 # 🧠 建立 session factory
@@ -123,6 +125,57 @@ def get_products_missing_sku_or_location() -> list[Product]:
               .all()
         )
 
+def fetch_all_products():
+    """從 DB 讀取所有 Product"""
+    with get_session() as db:
+        products = db.query(Product).all()
+        logger.info(f"Fetched {len(products)} products from DB")
+        return products
+
+def update_product( prod, sku: str = None, location: str = None):
+    """更新 product 的 sku 與 location 欄位"""
+    with get_session() as db:
+        if sku:
+            prod.sku = sku
+        if location:
+            prod.location = location
+        prod.updated_at = func.current_date()
+        db.add(prod)
+        db.commit()
+        logger.info(f"Updated product {prod.id}: sku={sku}, location={location}")
+
+
+def insert_price_history( product_id: int, price: float):
+    """新增一筆 ProductPriceHistory 紀錄"""
+    with get_session() as db:
+        record = ProductPriceHistory(
+            product_id=product_id,
+            price=price,
+        )
+        db.add(record)
+        db.commit()
+        logger.info(f"Inserted price history for product {product_id}: {price}")
+
+def get_product_random(limit: int = 10) -> list[Product]:
+    """
+    隨機取得指定數量的產品，條件為今天尚未有任何價格歷史記錄。
+    """
+    with get_session() as db:
+        today = date.today()
+        # 子查詢：檢查當日是否已有價格歷史
+        subq = db.query(ProductPriceHistory).filter(
+            ProductPriceHistory.product_id == Product.id,
+            func.date(ProductPriceHistory.created_at) == today
+        )
+        products = (
+            db.query(Product)
+              .filter(~subq.exists())
+              .order_by(func.random())
+              .limit(limit)
+              .all()
+        )
+        logger.info(f"Fetched {len(products)} random products without price history on {today}")
+        return products
 
 
 

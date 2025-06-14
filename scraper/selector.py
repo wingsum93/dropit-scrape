@@ -13,9 +13,9 @@ class Selector:
 
 @dataclass(frozen=True)
 class ProductDetailSelector:
-    NAME: str = 'div.fp-item-name span a'
+    NAME: str = 'h1.fp-page-header.fp-page-title'
     PRICE: str = 'div.fp-item-price span.fp-item-base-price'
     UNIT: str = 'div.fp-item-price span.fp-item-size'
     
-    LOCATIOIN: str = 'div.fp-item-content'
-    SKU: str = 'li.fp-pager-item-next a.fp-btn-next'
+    LOCATIOIN: str = 'div.fp-item-location'
+    SKU: str = 'div.fp-item-upc'

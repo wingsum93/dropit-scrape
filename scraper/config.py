@@ -26,3 +26,8 @@ class Config:
 
     # Optional: 其他 SQLAlchemy 設定
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    
+    # 
+    ONLINE_TIMEOUT = int(os.getenv('ONLINE_TIMEOUT', 20))  # 預設 10 秒
+    FETCH_PRODUCT_TIMEOUT = int(os.getenv('FETCH_PRODUCT_TIMEOUT', 30))  # 預設 30 秒
+    FETCH_PRODUCT_DETAIL_TIMEOUT = int(os.getenv('FETCH_PRODUCT_DETAIL_TIMEOUT', 30))  # 預設 30 秒
