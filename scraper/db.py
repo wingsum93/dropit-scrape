@@ -2,6 +2,7 @@ from typing import List
 from contextlib import contextmanager
 from sqlalchemy import create_engine, select, func
 from sqlalchemy import or_  # ✅ 這邊 import or_ 函式
+from sqlalchemy.sql import exists
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.exc import SQLAlchemyError
 from model import Base  # ✅ 這邊 import model.py 裡面的 Base
@@ -151,6 +152,7 @@ def insert_price_history( product_id: int, price: float):
         record = ProductPriceHistory(
             product_id=product_id,
             price=price,
+            created_at=date.today()
         )
         db.add(record)
         db.commit()
@@ -172,6 +174,25 @@ def get_product_random(limit: int = 10) -> list[Product]:
               .filter(~subq.exists())
               .order_by(func.random())
               .limit(limit)
+              .all()
+        )
+        logger.debug(f"Fetched {len(products)} random products without price history on {today}")
+        return products
+    
+def get_product_without_today_price_record() -> list[Product]:
+    """
+    取得all的產品，條件為今天尚未有任何價格歷史記錄。
+    """
+    with get_session() as db:
+        today = date.today()
+        # 建立 correlated EXISTS 子查詢
+        history_exists = exists().where(
+            (ProductPriceHistory.product_id == Product.id) &
+            (func.date(ProductPriceHistory.created_at) == today)
+        )
+        products = (
+            db.query(Product)
+              .filter(~history_exists)
               .all()
         )
         logger.debug(f"Fetched {len(products)} random products without price history on {today}")

@@ -3,7 +3,7 @@ from sqlalchemy import create_engine, func
 from sqlalchemy.orm import sessionmaker
 from datetime import  datetime
 from logger_setup import get_logger
-from db import get_product_random, update_product, insert_price_history
+from db import get_product_random, update_product, insert_price_history,get_product_without_today_price_record
 from selector import Selector,ProductDetailSelector
 import logging
 import re
@@ -66,8 +66,8 @@ def scrape_detail(page, url: str):
 # 3. 主程式邏輯
 def main():
     
-    products = get_product_random(limit=1000)
-    logger.info(f"Fetched {len(products)} products from DB")
+    products = get_product_without_today_price_record()
+    logger.warning(f"Fetched {len(products)} products from DB")
 
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=False)
