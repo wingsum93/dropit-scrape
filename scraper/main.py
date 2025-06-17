@@ -3,9 +3,9 @@ from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeo
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 from logger_setup import get_logger
-from db import insert_new_products
+from scraper.db.product_repo import insert_new_products
 from selector import Selector
-from model import Product
+from scraper.db.model import Product
 from decimal import Decimal, InvalidOperation
 from typing import List, Optional
 import logging

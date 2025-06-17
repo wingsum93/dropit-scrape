@@ -23,6 +23,11 @@ class Config:
         f"postgresql+psycopg://{DB_USER}:{DB_PASSWORD}"
         f"@{DB_HOST}:{DB_PORT}/{DB_NAME}"
     )
+    
+    SQLALCHEMY_DATABASE_URI_ASYNC = (
+        f"postgresql+asyncpg://{DB_USER}:{DB_PASSWORD}"
+        f"@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+    )
 
     # Optional: 其他 SQLAlchemy 設定
     SQLALCHEMY_TRACK_MODIFICATIONS = False
@@ -32,5 +37,5 @@ class Config:
     FETCH_PRODUCT_TIMEOUT = int(os.getenv('FETCH_PRODUCT_TIMEOUT', 30))  # 預設 30 秒
     FETCH_PRODUCT_DETAIL_TIMEOUT = int(os.getenv('FETCH_PRODUCT_DETAIL_TIMEOUT', 30))  # 預設 30 秒
 
-    SHOW_UI = os.getenv('SHOW_UI', 'true').lower() in ('true', '1', 'yes')  # 預設為 True
-    MAX_TAB_FOR_PRODUCT_DETAIL = 3
+    SHOW_UI = os.getenv('SHOW_UI', 'false').lower() in ('true', '1', 'yes')  # 預設為 True
+    MAX_TAB_FOR_PRODUCT_DETAIL = 2
