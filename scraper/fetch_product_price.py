@@ -3,12 +3,12 @@ from sqlalchemy import func
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import asyncio
 from datetime import  datetime
-from logger_setup import get_logger
-from scraper import Selector, ProductDetailSelector
-from db.repository_factory import get_product_repo
 import logging
 import re
-from config import Config
+from .logger_setup import get_logger
+from scraper import Selector, ProductDetailSelector
+from scraper.db.repository_factory import get_product_repo
+from scraper.config import Config
 
 # Import your ORM models
 from scraper.db.model import Product, ProductPriceHistory  # adjust import path as needed

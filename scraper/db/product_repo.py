@@ -10,10 +10,10 @@ from sqlalchemy.exc import SQLAlchemyError
 from scraper.db.model import Base  # ✅ 這邊 import model.py 裡面的 Base
 from scraper.db.model import Product  # ✅ 這邊 import model.py 裡面的 Product
 from scraper.db.model import ProductPriceHistory  # ✅ 這邊 import model.py 裡面的 ProductPriceHistory
-
+from scraper.db.sync_engine import engine  # ✅ 這邊 import sync_engine.py 裡面的 SessionLocal
 from dotenv import load_dotenv
-from logger_setup import get_logger  # ✅ 這邊 import logger_setup.py 裡面的 get_logger
-from config import Config
+from scraper.logger_setup import get_logger  # ✅ 這邊 import logger_setup.py 裡面的 get_logger
+from scraper.config import Config
 from typing import Callable, AsyncGenerator, Generator
 import logging
 import csv
@@ -43,7 +43,7 @@ class ProductRepository:
         初始化資料庫（建立資料表），只需執行一次。
         """
         try:
-            Base.metadata.create_all(bind=Session)
+            Base.metadata.create_all(bind=engine)
             logger.info("✅ Database initialized successfully.")
         except Exception as e:
             logger.exception(f"❌ Failed to initialize DB: {e}")
