@@ -2,10 +2,11 @@
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
-from logger_setup import get_logger
-from db import insert_new_products
-from selector import Selector
-from model import Product
+from scraper.logger_setup import get_logger
+
+from scraper.selector import Selector
+from scraper.db.model import Product
+from scraper.db.repository_factory import get_product_repo
 from decimal import Decimal, InvalidOperation
 from typing import List, Optional
 import logging
@@ -13,7 +14,7 @@ import json
 import time
 
 logger = get_logger(__name__, log_file="logs/dropit.log", level=logging.DEBUG)
-
+repo = get_product_repo()
 BASE_URL = 'https://www.dropit.bm'
 
 def extract_product_info(html) -> List[Product]:
@@ -110,7 +111,7 @@ def run_category_scraper(category_name: str, url: str) -> None:
                 rp.category = category_name
                 products.append(rp)
 
-            insert_new_products(products)
+            repo.insert_new_products(products)
         finally:
             browser.close()
 

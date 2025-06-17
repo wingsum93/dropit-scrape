@@ -1,101 +1,129 @@
-from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
-from sqlalchemy import create_engine, func 
-from sqlalchemy.orm import sessionmaker
+from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
+from sqlalchemy import func 
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import asyncio
 from datetime import  datetime
-from logger_setup import get_logger
-from db import get_product_random, update_product, insert_price_history,get_product_without_today_price_record
-from selector import Selector,ProductDetailSelector
 import logging
 import re
-from config import Config
+from .logger_setup import get_logger
+from scraper import Selector, ProductDetailSelector
+from scraper.db.repository_factory import get_product_repo
+from scraper.config import Config
 
 # Import your ORM models
-from model import Product, ProductPriceHistory  # adjust import path as needed
+from scraper.db.model import Product, ProductPriceHistory  # adjust import path as needed
 
 # 設定 logging
-logger = get_logger(__name__, log_file="logs/dropit.log", level=logging.DEBUG)
-
+logger = get_logger(__name__, log_file="logs/fetch_product_detail.log", level=logging.DEBUG)
+repo = get_product_repo()
+# 抽取 SKU
 def extract_sku(text: str) -> str:
     lines = [line.strip() for line in text.splitlines() if line.strip()]
-    # Step 2: Try regex match on whole text (fallback-safe)
     match = re.search(r'\b\d{8,}\b', text)
     if match:
         return match.group()
-    
-    # Step 3: Fallback to last non-empty line (in case regex fails)
-    if lines:
-        return lines[-1]
-    
-    return ''
+    return lines[-1] if lines else ''
+
+# 抽取位置
 def extract_location(text: str) -> str:
     if "Location:" in text:
         return text.split("Location:")[1].strip()
     return ''
-# 2. 定義抓取細節函式
-def scrape_detail(page, url: str):
-    """
-    使用 page instance 進入產品細節頁面，抓取 price, sku, location
-    回傳 tuple(price: float, sku: str, location: str)
-    """
-    try:
-        page.goto(url, timeout=Config.ONLINE_TIMEOUT*1000)
-        # 等待關鍵元素載入
-        page.wait_for_selector(ProductDetailSelector.PRICE, timeout=Config.FETCH_PRODUCT_DETAIL_TIMEOUT*1000)
-    except PlaywrightTimeoutError:
-        logger.warning(f"Timeout loading {url}")
-        return None, None, None
 
-    # 提取資料 (請替換成實際的 selector)
-    price_text = page.query_selector(ProductDetailSelector.PRICE).inner_text().strip()
-    sku_elem = page.query_selector(ProductDetailSelector.SKU)
-    location_elem = page.query_selector(ProductDetailSelector.LOCATIOIN)
-    logger.info(f"Scraping {url} - Price: {price_text}, SKU: {sku_elem}, Location: {location_elem}")
-    # 清理與轉型
-    try:
-        price = float(price_text.replace('$', '').replace(',', ''))
-    except ValueError:
-        price = None
-        logger.error(f"Failed to parse price from '{price_text}' @ {url}")
+# 單一產品 fetch 任務
+async def fetch_product_detail(prod, browser_semaphore, browser):
+    async with browser_semaphore:
+        context = await browser.new_context()
+        page = await context.new_page()
+        try:
+            await page.goto(prod.url, timeout=Config.ONLINE_TIMEOUT * 1000)
+            await page.wait_for_selector(
+                ProductDetailSelector.PRICE,
+                timeout=Config.FETCH_PRODUCT_DETAIL_TIMEOUT * 1000
+            )
 
-    sku_raw = sku_elem.inner_text().strip() if sku_elem else None
-    sku = extract_sku(sku_raw) if sku_raw else None
-    location_raw = location_elem.inner_text().strip() if location_elem else None
-    location = extract_location(location_raw) if location_raw else None
-    return price, sku, location
+            price_elem = await page.query_selector(ProductDetailSelector.PRICE)
+            sku_elem = await page.query_selector(ProductDetailSelector.SKU)
+            location_elem = await page.query_selector(ProductDetailSelector.LOCATION)
 
-# 3. 主程式邏輯
-def main():
-    
-    products = get_product_without_today_price_record()
-    logger.warning(f"Fetched {len(products)} products from DB")
+            price_text = await price_elem.inner_text() if price_elem else ''
+            price_text = price_text.strip()
+            try:
+                price = float(price_text.replace('$', '').replace(',', ''))
+            except ValueError:
+                price = None
+                logger.error(f"❌ Failed to parse price '{price_text}' @ {prod.url}")
 
-    with sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=not Config.SHOW_UI)
-        page = browser.new_page()
+            sku_raw = (await sku_elem.inner_text()).strip() if sku_elem else None
+            location_raw = (await location_elem.inner_text()).strip() if location_elem else None
+            sku = extract_sku(sku_raw) if sku_raw else None
+            location = extract_location(location_raw) if location_raw else None
 
-        for prod in products:
-            # 只有在 sku 或 location 為空時才更新
-            needs_update = prod.sku is None or prod.location is None
-            price, sku, location = scrape_detail(page, prod.url)
+            return {
+                "prod": prod,
+                "price": price,
+                "sku": sku,
+                "location": location
+            }
 
-            if needs_update and (sku or location):
-                # 如果有新的 sku 或 location，則更新產品
-                update_product(prod,sku=sku, location=location)
-                logger.info(f"Updated product {prod.id}: sku={sku}, location={location}")
+        except PlaywrightTimeoutError:
+            logger.warning(f"⏱️ Timeout loading {prod.url}")
+            raise
+        except Exception as e:
+            logger.error(f"❌ Error fetching {prod.url}: {e}")
+            raise
+        finally:
+            await page.close()
+            await context.close()
 
-            # 不論是否需要更新，都要記錄價格歷史
-            if price is not None:
-                # 新增價格歷史紀錄
-                insert_price_history(prod.id,price=price)
-                logger.info(f"Inserted price history for product {prod.id}: {price}")
+# 批次處理：所有 fetch 成功才寫入
+async def run_batch(products, browser, browser_semaphore):
+    tasks = [fetch_product_detail(prod, browser_semaphore, browser) for prod in products]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
 
-            # 避免過度頻繁，建議稍微延遲
-            page.wait_for_timeout(500)  # 0.5 秒
+    if any(isinstance(res, Exception) for res in results):
+        failed_count = sum(1 for res in results if isinstance(res, Exception))
+        logger.warning(f"⚠️ Skip DB write: {failed_count} products failed to fetch.")
+        return
 
-        # 最後提交所有變更
-        
-        browser.close()
-    
+    # All success → proceed to DB write
+    for result in results:
+        prod = result["prod"]
+        price = result["price"]
+        sku = result["sku"]
+        location = result["location"]
+
+        if (prod.sku is None or prod.location is None) and (sku or location):
+            repo.update_product(prod, sku=sku, location=location)
+            logger.info(f"📝 Updated product {prod.id}: sku={sku}, location={location}")
+
+        if price is not None:
+            repo.insert_price_history(prod.id, price)
+            logger.info(f"💰 Inserted price history for {prod.id}: {price}")
+
+# 主流程：不斷拿 batch
+async def main():
+    max_tabs = Config.MAX_TAB_FOR_PRODUCT_DETAIL
+    browser_semaphore = asyncio.Semaphore(max_tabs)
+
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=not Config.SHOW_UI)
+
+        total = 10
+        batch_size = 2
+        processed = 0
+
+        while processed < total:
+            products = repo.get_product_random(batch_size)
+            if not products:
+                logger.info("🎯 No more products to process.")
+                break
+
+            logger.info(f"📦 Running batch of {len(products)} products...")
+            await run_batch(products, browser, browser_semaphore)
+            processed += len(products)
+
+        await browser.close()
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
