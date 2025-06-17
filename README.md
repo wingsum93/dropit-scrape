@@ -19,19 +19,10 @@ pip install -r requirements.txt
 
 ### Init postgresdb
 ```shell
-python -m scraper.db.product_repo
+python ./scraper/db.py
 ```
 
-## Run the proj.
-### Fetch all product from category
-```shell
-python -m scraper.main
-```
 
-### fetch Product Items
-```shell
-python -m scraper.fetch_product_price
-```
 
 
 
