@@ -40,3 +40,10 @@ Install postgres db (optional)
 
 # Goal of the project
 Fetch all items from the Devonshire Shop
+
+
+
+## current issue
+All product is around 13,628 items
+
+But if we go to produc detail website, it take serval second to fetch data. So it take up to 5~6 second to fetch 1 product. The overall process take 68140 second (18.92 hours)

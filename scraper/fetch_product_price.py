@@ -70,7 +70,7 @@ def main():
     logger.warning(f"Fetched {len(products)} products from DB")
 
     with sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=False)
+        browser = pw.chromium.launch(headless=not Config.SHOW_UI)
         page = browser.new_page()
 
         for prod in products:
