@@ -1,9 +1,7 @@
-from sqlalchemy import create_engine, Integer, String
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, Session
+from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy import (
     Column, Integer, String, Numeric, DateTime,Date, func
 )
-from sqlalchemy.ext.declarative import declarative_base
 
 
 # 1. Define base model

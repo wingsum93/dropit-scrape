@@ -14,7 +14,7 @@ from scraper.config import Config
 from scraper.db.model import Product, ProductPriceHistory  # adjust import path as needed
 
 # 設定 logging
-logger = get_logger(__name__, log_file="logs/fetch_product_detail.log", level=logging.DEBUG)
+logger = get_logger(__name__, log_file="logs/fetch_product_detail.log", level=logging.INFO)
 repo = get_product_repo()
 # 抽取 SKU
 def extract_sku(text: str) -> str:
@@ -109,8 +109,8 @@ async def main():
     async with async_playwright() as pw:
         browser = await pw.chromium.launch(headless=not Config.SHOW_UI)
 
-        total = 10
-        batch_size = 2
+        total = 1500
+        batch_size = 3
         processed = 0
 
         while processed < total:

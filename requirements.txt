@@ -2,6 +2,7 @@
 selenium==4.33.0
 webdriver-manager==4.0.2
 pytest-playwright>=0.7.0
+playwright>=1.43.0
 beautifulsoup4==4.13.4
 pandas>=2.2.3
 
@@ -9,6 +10,9 @@ pandas>=2.2.3
 sqlalchemy>=2.0.41
 psycopg[binary]>=3.2.0
 asyncpg>=0.28.0
+
+# env
+python-dotenv>=1.0.0
 
 # for testing
 behave==1.2.6
